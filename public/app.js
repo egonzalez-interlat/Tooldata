@@ -1,80 +1,113 @@
-console.log("This is working!");
-
-(function () {
+(function() {
+  // Create the connector object
   var myConnector = tableau.makeConnector();
 
-  myConnector.getSchema = function (schemaCallback) {
-    const covidCols = [
-      {
-        id: "Date_of_report",
-        dataType: tableau.dataTypeEnum.date,
-      },
-      {
-        id: "Municipality_code",
-        dataType: tableau.dataTypeEnum.string,
-      },
-      {
-        id: "Municipality_name",
-        dataType: tableau.dataTypeEnum.string,
-      },
-      {
-        id: "Province",
-        dataType: tableau.dataTypeEnum.string,
-      },
-      {
-        id: "Total_reported",
-        dataType: tableau.dataTypeEnum.int,
-      },
-      {
-        id: "Hospital_admission",
-        dataType: tableau.dataTypeEnum.int,
-      },
-      {
-        id: "Deceased",
-        dataType: tableau.dataTypeEnum.int,
-      },
-    ];
+  // Define the schema
+  myConnector.getSchema = function(schemaCallback) {
+      var cols = [
+        {
+          id: "id",
+          dataType: tableau.dataTypeEnum.string
+        },
+        {
+          id: "name",
+          dataType: tableau.dataTypeEnum.string
+        },
+        {
+          id: "status",
+          dataType: tableau.dataTypeEnum.string
+        },
+        {
+          id: "created_at",
+          dataType: tableau.dataTypeEnum.date
+        },
+        {
+          id: "updated_at",
+          dataType: tableau.dataTypeEnum.date
+        }
+      ];
 
-    let covidTableSchema = {
-      id: "RIVM",
-      alias: "Dutch Corona Cases since start",
-      columns: covidCols,
-    };
+      var tableSchema = {
+          id: "collectionsTooldata",
+          alias: "Collections Tool Data",
+          columns: cols
+      };
 
-    schemaCallback([covidTableSchema]);
+      schemaCallback([tableSchema]);
   };
 
-  myConnector.getData = function (table, doneCallback) {
-    let tableData = [];
-    var i = 0;
-
-    $.getJSON(
-      "https://data.rivm.nl/covid-19/COVID-19_aantallen_gemeente_cumulatief.json",
-      function (resp) {
-        // Iterate over the JSON object
-        for (i = 0, len = resp.length; i < len; i++) {
-          tableData.push({
-            Date_of_report: resp[i].Date_of_report,
-            Municipality_code: resp[i].Municipality_code,
-            Municipality_name: resp[i].Municipality_name,
-            Province: resp[i].Province,
-            Total_reported: resp[i].Total_reported,
-            Hospital_admission: resp[i].Hospital_admission,
-            Deceased: resp[i].Deceased,
-          });
-        }
-        table.appendRows(tableData);
-        doneCallback();
+  // Download the data
+  myConnector.getData = function(table, doneCallback) {
+    var xmlhttp = new XMLHttpRequest();
+    var url = "https://api.tooldata.io/collections";
+    
+    xmlhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        var value = JSON.parse(this.responseText);
+        getTableJson(value);
       }
-    );
+    };
+    
+    xmlhttp.open("GET", url, true);
+    xmlhttp.setRequestHeader("Accept", "application/json");
+    xmlhttp.setRequestHeader("Authorization", "ApiKey aAJoMJ8DNOqXPhRKNCNTG9yhc/+k2FSQwTfaIy5jPFM=");
+    xmlhttp.send();
+
+    function getTableJson(value) {
+      var tableData = [];
+      // Iterate over the JSON object
+      for (var i = 0, len = value.length; i < len; i++) {
+          tableData.push({
+              "id": value[i].id,
+              "name": value[i].name,
+              "status": value[i].status,
+              "created_at": value[i].created_at,
+              "updated_at": value[i].updated_at
+          });
+      }
+
+      table.appendRows(tableData);
+      doneCallback();
+    };
   };
 
   tableau.registerConnector(myConnector);
 })();
 
-document.querySelector("#getData").addEventListener("click", getData);
+// Create event listeners for when the user submits the form
+$(document).ready(function() {
+    $("#submitButton").click(function() {
+      var xmlhttp = new XMLHttpRequest();
+      var url = "https://api.tooldata.io/collections";
+      var tableData = [];
+      
+      xmlhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          var value = JSON.parse(this.responseText);
+          getTableJson(value);
+        }
+      };
+      
+      xmlhttp.open("GET", url, true);
+      xmlhttp.setRequestHeader("Accept", "application/json");
+      xmlhttp.setRequestHeader("Authorization", "ApiKey aAJoMJ8DNOqXPhRKNCNTG9yhc/+k2FSQwTfaIy5jPFM=");
+      xmlhttp.send();
+      console.log(tableData);
 
-function getData() {
-  tableau.connectionName = "Dutch Corona Numbers";
-  tableau.submit();
-}
+      function getTableJson(value) {
+          // Iterate over the JSON object
+          for (var i = 0, len = value.length; i < len; i++) {
+              tableData.push({
+                  "id": value[i].id,
+                  "name": value[i].name,
+                  "status": value[i].status,
+                  "created_at": value[i].created_at,
+                  "updated_at": value[i].updated_at,
+                  "tags": value[i].tags
+              });
+          }
+      };
+      tableau.connectionName = "Collections Tooldata"; // This will be the data source name in Tableau
+      tableau.submit(); // This sends the connector object to Tableau
+    });
+});
